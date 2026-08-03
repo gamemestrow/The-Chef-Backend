@@ -38,6 +38,41 @@ export const authenticate = (
 };
 
 /**
+ * Optional Authentication Middleware:
+ * If Bearer token is provided, decodes and attaches user to req.user; otherwise proceeds.
+ */
+export const optionalAuthenticate = (
+  req: AuthenticatedRequest,
+  _res: Response,
+  next: NextFunction
+): void => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+
+  const token = authHeader.split(' ')[1];
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const decoded = verifyJwtToken(token);
+    req.user = {
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role,
+      name: decoded.name,
+    };
+  } catch {
+    // If token invalid in optional mode, continue as guest
+  }
+
+  next();
+};
+
+/**
  * Role-Based Authorization Middleware:
  * Restricts endpoint access to specific user roles (e.g. 'admin', 'chef', 'student').
  */

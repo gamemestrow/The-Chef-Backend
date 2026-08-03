@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { getDbPool } from '../config/db';
 import { MealOfTheDay } from '../types';
 
@@ -13,6 +14,7 @@ export interface MealRecord {
 }
 
 export interface CreateMealInput {
+  id?: string;
   name: string;
   image: string;
   quantity: number;
@@ -51,13 +53,16 @@ export const initMealTable = async (): Promise<void> => {
  */
 export const createMealInDb = async (meal: CreateMealInput): Promise<MealRecord> => {
   const pool = getDbPool();
+  const id = meal.id || randomUUID();
+
   const query = `
-    INSERT INTO meals (name, image, quantity, date, created_by)
-    VALUES ($1, $2, $3, COALESCE($4::date, CURRENT_DATE), $5)
+    INSERT INTO meals (id, name, image, quantity, date, created_by)
+    VALUES ($1, $2, $3, $4, COALESCE($5::date, CURRENT_DATE), $6)
     RETURNING id, name, image, quantity, date, created_by, created_at, updated_at
   `;
 
   const result = await pool.query(query, [
+    id,
     meal.name.trim(),
     meal.image.trim(),
     meal.quantity,

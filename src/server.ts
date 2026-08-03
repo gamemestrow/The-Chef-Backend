@@ -4,6 +4,8 @@ import { checkDbConnection } from './config/db';
 import { initUserTable } from './models/user.model';
 import { initMealTable } from './models/meal.model';
 import { initMenuItemTable } from './models/menuItem.model';
+import { initFeedbackTable } from './models/feedback.model';
+import { initNotificationTable } from './models/notification.model';
 
 const startServer = async () => {
   try {
@@ -15,6 +17,8 @@ const startServer = async () => {
       await initUserTable();
       await initMealTable();
       await initMenuItemTable();
+      await initFeedbackTable();
+      await initNotificationTable();
     } else {
       console.log('ℹ️  Running with offline / placeholder database mode until valid DATABASE_URL is configured in .env.');
     }

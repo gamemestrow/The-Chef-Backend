@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { getDbPool } from '../config/db';
 
 export interface MenuItemRecord {
@@ -13,18 +14,18 @@ export interface MenuItemRecord {
   createdAt?: string;
   updatedAt?: string;
   categoryId?: string | null;
-  category?: string | null;
 }
 
 export interface MenuItemFilter {
-  category?: string;
   categoryId?: string;
   isAvailable?: boolean;
   isFeatured?: boolean;
   search?: string;
+  limit?: number;
 }
 
 export interface CreateMenuItemInput {
+  id?: string;
   title: string;
   description?: string;
   price: number;
@@ -34,7 +35,6 @@ export interface CreateMenuItemInput {
   discountPrice?: number;
   specialOffer?: string;
   categoryId?: string;
-  category?: string;
 }
 
 /**
@@ -44,7 +44,7 @@ export const initMenuItemTable = async (): Promise<void> => {
   const pool = getDbPool();
   const query = `
     CREATE TABLE IF NOT EXISTS "MenuItem" (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      id VARCHAR(255) PRIMARY KEY,
       title VARCHAR(255) NOT NULL,
       description TEXT,
       price NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
@@ -55,10 +55,8 @@ export const initMenuItemTable = async (): Promise<void> => {
       "specialOffer" TEXT,
       "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      "categoryId" VARCHAR(100),
-      category VARCHAR(100)
+      "categoryId" VARCHAR(100)
     );
-    CREATE INDEX IF NOT EXISTS idx_menuitem_category ON "MenuItem"(category);
     CREATE INDEX IF NOT EXISTS idx_menuitem_category_id ON "MenuItem"("categoryId");
     CREATE INDEX IF NOT EXISTS idx_menuitem_is_available ON "MenuItem"("isAvailable");
     CREATE INDEX IF NOT EXISTS idx_menuitem_is_featured ON "MenuItem"("isFeatured");
@@ -72,8 +70,7 @@ export const initMenuItemTable = async (): Promise<void> => {
 };
 
 /**
- * Maps database row (handling both quoted camelCase and snake_case column names)
- * to a consistent MenuItemRecord.
+ * Maps database row to a consistent MenuItemRecord.
  */
 const mapMenuItemRow = (row: any): MenuItemRecord => ({
   id: row.id,
@@ -93,13 +90,12 @@ const mapMenuItemRow = (row: any): MenuItemRecord => ({
   createdAt: row.createdAt ?? row.created_at ?? row.CreatedAt ?? null,
   updatedAt: row.updatedAt ?? row.updated_at ?? null,
   categoryId: row.categoryId ?? row.category_id ?? null,
-  category: row.category ?? null,
 });
 
 /**
  * Fetches all menu items from Neon PostgreSQL with optional filters.
  *
- * @param filters - Optional filters: category, categoryId, isAvailable, isFeatured, search
+ * @param filters - Optional filters: categoryId, isAvailable, isFeatured, search, limit
  * @returns Promise<MenuItemRecord[]>
  */
 export const getAllMenuItemsFromDb = async (
@@ -113,38 +109,32 @@ export const getAllMenuItemsFromDb = async (
       title,
       description,
       price::float AS price,
-      COALESCE("imageUrl", image_url, image) AS "imageUrl",
-      COALESCE("isAvailable", is_available, TRUE) AS "isAvailable",
-      COALESCE("isFeatured", is_featured, FALSE) AS "isFeatured",
-      COALESCE("discountPrice", discount_price)::float AS "discountPrice",
-      COALESCE("specialOffer", special_offer) AS "specialOffer",
-      COALESCE("createdAt", created_at, CURRENT_TIMESTAMP) AS "createdAt",
-      COALESCE("updatedAt", updated_at, CURRENT_TIMESTAMP) AS "updatedAt",
-      COALESCE("categoryId", category_id) AS "categoryId",
-      category
+      "imageUrl",
+      "isAvailable",
+      "isFeatured",
+      "discountPrice"::float AS "discountPrice",
+      "specialOffer",
+      "createdAt",
+      "updatedAt",
+      "categoryId"
     FROM "MenuItem"
     WHERE 1=1
   `;
   const params: unknown[] = [];
 
-  if (filters?.category) {
-    params.push(filters.category.trim());
-    query += ` AND LOWER(category) = LOWER($${params.length})`;
-  }
-
   if (filters?.categoryId) {
     params.push(filters.categoryId.trim());
-    query += ` AND ("categoryId" = $${params.length} OR category_id = $${params.length})`;
+    query += ` AND "categoryId"::text = $${params.length}`;
   }
 
   if (filters?.isAvailable !== undefined) {
     params.push(filters.isAvailable);
-    query += ` AND (COALESCE("isAvailable", is_available) = $${params.length})`;
+    query += ` AND "isAvailable" = $${params.length}`;
   }
 
   if (filters?.isFeatured !== undefined) {
     params.push(filters.isFeatured);
-    query += ` AND (COALESCE("isFeatured", is_featured) = $${params.length})`;
+    query += ` AND "isFeatured" = $${params.length}`;
   }
 
   if (filters?.search) {
@@ -152,16 +142,26 @@ export const getAllMenuItemsFromDb = async (
     query += ` AND (title ILIKE $${params.length} OR description ILIKE $${params.length})`;
   }
 
-  query += ` ORDER BY "isFeatured" DESC, category ASC, title ASC`;
+  query += ` ORDER BY "isFeatured" DESC, title ASC`;
+
+  if (filters?.limit) {
+    params.push(filters.limit);
+    query += ` LIMIT $${params.length}`;
+  }
 
   try {
     const result = await pool.query(query, params);
     return result.rows.map(mapMenuItemRow);
   } catch (error) {
-    // Fallback if table name is lowercase menu_items
+    console.warn('[MenuItemModel] Retrying with generic SELECT * FROM "MenuItem"...');
     try {
-      const fallbackQuery = query.replace('FROM "MenuItem"', 'FROM menu_items');
-      const fallbackResult = await pool.query(fallbackQuery, params);
+      let fallbackQuery = `SELECT * FROM "MenuItem" WHERE 1=1`;
+      const fallbackParams: unknown[] = [];
+      if (filters?.search) {
+        fallbackParams.push(`%${filters.search.trim()}%`);
+        fallbackQuery += ` AND (title ILIKE $${fallbackParams.length} OR description ILIKE $${fallbackParams.length})`;
+      }
+      const fallbackResult = await pool.query(fallbackQuery, fallbackParams);
       return fallbackResult.rows.map(mapMenuItemRow);
     } catch {
       throw error;
@@ -172,7 +172,7 @@ export const getAllMenuItemsFromDb = async (
 /**
  * Fetches a single menu item by ID from MenuItem table.
  *
- * @param id - UUID of the menu item
+ * @param id - UUID/string of the menu item
  * @returns Promise<MenuItemRecord | null>
  */
 export const getMenuItemByIdFromDb = async (
@@ -185,15 +185,14 @@ export const getMenuItemByIdFromDb = async (
       title,
       description,
       price::float AS price,
-      COALESCE("imageUrl", image_url, image) AS "imageUrl",
-      COALESCE("isAvailable", is_available, TRUE) AS "isAvailable",
-      COALESCE("isFeatured", is_featured, FALSE) AS "isFeatured",
-      COALESCE("discountPrice", discount_price)::float AS "discountPrice",
-      COALESCE("specialOffer", special_offer) AS "specialOffer",
-      COALESCE("createdAt", created_at, CURRENT_TIMESTAMP) AS "createdAt",
-      COALESCE("updatedAt", updated_at, CURRENT_TIMESTAMP) AS "updatedAt",
-      COALESCE("categoryId", category_id) AS "categoryId",
-      category
+      "imageUrl",
+      "isAvailable",
+      "isFeatured",
+      "discountPrice"::float AS "discountPrice",
+      "specialOffer",
+      "createdAt",
+      "updatedAt",
+      "categoryId"
     FROM "MenuItem"
     WHERE id = $1
     LIMIT 1
@@ -203,9 +202,8 @@ export const getMenuItemByIdFromDb = async (
     const result = await pool.query(query, [id]);
     return result.rows[0] ? mapMenuItemRow(result.rows[0]) : null;
   } catch (error) {
-    // Fallback if table name is lowercase menu_items
     try {
-      const fallbackQuery = query.replace('FROM "MenuItem"', 'FROM menu_items');
+      const fallbackQuery = `SELECT * FROM "MenuItem" WHERE id = $1 LIMIT 1`;
       const fallbackResult = await pool.query(fallbackQuery, [id]);
       return fallbackResult.rows[0] ? mapMenuItemRow(fallbackResult.rows[0]) : null;
     } catch {
@@ -216,13 +214,17 @@ export const getMenuItemByIdFromDb = async (
 
 /**
  * Creates a new menu item in Neon PostgreSQL.
+ * Automatically generates a UUID for id if not provided.
  */
 export const createMenuItemInDb = async (
   item: CreateMenuItemInput
 ): Promise<MenuItemRecord> => {
   const pool = getDbPool();
+  const id = item.id || randomUUID();
+
   const query = `
     INSERT INTO "MenuItem" (
+      id,
       title,
       description,
       price,
@@ -231,10 +233,9 @@ export const createMenuItemInDb = async (
       "isFeatured",
       "discountPrice",
       "specialOffer",
-      "categoryId",
-      category
+      "categoryId"
     )
-    VALUES ($1, $2, $3, $4, COALESCE($5, TRUE), COALESCE($6, FALSE), $7, $8, $9, $10)
+    VALUES ($1, $2, $3, $4, $5, COALESCE($6, TRUE), COALESCE($7, FALSE), $8, $9, $10)
     RETURNING 
       id,
       title,
@@ -247,11 +248,11 @@ export const createMenuItemInDb = async (
       "specialOffer",
       "createdAt",
       "updatedAt",
-      "categoryId",
-      category
+      "categoryId"
   `;
 
   const result = await pool.query(query, [
+    id,
     item.title.trim(),
     item.description?.trim() || null,
     item.price,
@@ -261,7 +262,6 @@ export const createMenuItemInDb = async (
     item.discountPrice ?? null,
     item.specialOffer?.trim() || null,
     item.categoryId?.trim() || null,
-    item.category?.trim() || null,
   ]);
 
   return mapMenuItemRow(result.rows[0]);

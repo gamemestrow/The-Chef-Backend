@@ -10,7 +10,7 @@ import { AuthenticatedRequest } from '../types';
 /**
  * Fetch all menu items from MenuItem table
  * Endpoint: GET /api/menu-items
- * Query Params: ?category=Pizza&categoryId=cat123&isAvailable=true&isFeatured=true&search=burger
+ * Query Params: ?categoryId=cat123&isAvailable=true&isFeatured=true&search=burger
  */
 export const getMenuItems = async (
   req: Request,
@@ -18,7 +18,7 @@ export const getMenuItems = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { category, categoryId, isAvailable, available, isFeatured, featured, search } = req.query;
+    const { categoryId, isAvailable, available, isFeatured, featured, search, limit } = req.query;
 
     const availableFilter =
       isAvailable !== undefined
@@ -35,11 +35,11 @@ export const getMenuItems = async (
         : undefined;
 
     const items = await getAllMenuItemsFromDb({
-      category: category ? String(category) : undefined,
       categoryId: categoryId ? String(categoryId) : undefined,
       isAvailable: availableFilter,
       isFeatured: featuredFilter,
       search: search ? String(search) : undefined,
+      limit: limit ? Number(limit) : undefined,
     });
 
     res.status(200).json({
@@ -88,7 +88,7 @@ export const getMenuItemById = async (
 /**
  * Create a new menu item
  * Endpoint: POST /api/menu-items
- * Body: { title, description, price, imageUrl, isAvailable, isFeatured, discountPrice, specialOffer, categoryId, category }
+ * Body: { title, description, price, imageUrl, isAvailable, isFeatured, discountPrice, specialOffer, categoryId }
  */
 export const createMenuItem = async (
   req: AuthenticatedRequest,
@@ -108,7 +108,6 @@ export const createMenuItem = async (
       discountPrice,
       specialOffer,
       categoryId,
-      category,
     } = req.body;
 
     const finalTitle = title || name;
@@ -131,7 +130,6 @@ export const createMenuItem = async (
       discountPrice: discountPrice !== undefined && discountPrice !== null ? Number(discountPrice) : undefined,
       specialOffer: specialOffer ? String(specialOffer).trim() : undefined,
       categoryId: categoryId ? String(categoryId).trim() : undefined,
-      category: category ? String(category).trim() : undefined,
     });
 
     res.status(201).json({

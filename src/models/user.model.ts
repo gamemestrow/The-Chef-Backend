@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { getDbPool } from '../config/db';
 import { UserRole } from '../types';
 
@@ -42,19 +43,23 @@ export const initUserTable = async (): Promise<void> => {
  * Inserts a new user into Neon PostgreSQL.
  */
 export const createUserInDb = async (user: {
+  id?: string;
   email: string;
   passwordHash: string;
   name: string;
   role: UserRole;
 }): Promise<SafeUser> => {
   const pool = getDbPool();
+  const id = user.id || randomUUID();
+
   const query = `
-    INSERT INTO users (email, password_hash, name, role)
-    VALUES ($1, $2, $3, $4)
+    INSERT INTO users (id, email, password_hash, name, role)
+    VALUES ($1, $2, $3, $4, $5)
     RETURNING id, email, name, role, created_at, updated_at
   `;
 
   const result = await pool.query(query, [
+    id,
     user.email.toLowerCase().trim(),
     user.passwordHash,
     user.name.trim(),

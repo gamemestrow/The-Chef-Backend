@@ -3,6 +3,8 @@ import authRoutes from './auth.routes';
 import userRoutes from './user.routes';
 import mealRoutes from './meal.routes';
 import menuItemRoutes from './menuItem.routes';
+import feedbackRoutes from './feedback.routes';
+import notificationRoutes from './notification.routes';
 import { checkDbConnection } from '../config/db';
 
 const router = Router();
@@ -25,5 +27,8 @@ router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/meals', mealRoutes);
 router.use('/menu-items', menuItemRoutes);
+router.use('/feedback', feedbackRoutes);
+router.use('/student-notifications', notificationRoutes);
+router.use('/notifications', notificationRoutes);
 
 export default router;
