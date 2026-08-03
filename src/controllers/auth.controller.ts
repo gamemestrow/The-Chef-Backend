@@ -2,7 +2,13 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import { UserRole, AuthenticatedRequest } from '../types';
 import { AppError } from '../middlewares/error.middleware';
-import { createUserInDb, findUserByEmailInDb, findUserByIdInDb } from '../models/user.model';
+import {
+  createUserInDb,
+  findUserByEmailInDb,
+  findUserByIdInDb,
+  findUserWithPasswordByIdInDb,
+  updateUserPasswordInDb,
+} from '../models/user.model';
 import { signJwtToken } from '../utils/jwt';
 
 /**
@@ -143,6 +149,64 @@ export const getMe = async (
       success: true,
       message: 'Current user profile retrieved',
       data: user,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Change password for authenticated user.
+ * Endpoint: POST /api/auth/change-password or PUT /api/auth/change-password
+ * Body: { currentPassword, newPassword }
+ */
+export const changePassword = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.user?.id) {
+      throw new AppError(401, 'Not authenticated');
+    }
+
+    const { currentPassword, oldPassword, newPassword } = req.body;
+    const existingPassword = currentPassword || oldPassword;
+
+    if (!existingPassword || !newPassword) {
+      throw new AppError(400, 'Current password and new password are both required');
+    }
+
+    if (typeof newPassword !== 'string' || newPassword.length < 6) {
+      throw new AppError(400, 'New password must be at least 6 characters long');
+    }
+
+    if (existingPassword === newPassword) {
+      throw new AppError(400, 'New password cannot be the same as the current password');
+    }
+
+    // Fetch user with password hash
+    const user = await findUserWithPasswordByIdInDb(req.user.id);
+    if (!user) {
+      throw new AppError(404, 'User not found');
+    }
+
+    // Verify current password
+    const isCurrentPasswordCorrect = await bcrypt.compare(existingPassword, user.password_hash);
+    if (!isCurrentPasswordCorrect) {
+      throw new AppError(400, 'Current password is incorrect');
+    }
+
+    // Hash new password
+    const saltRounds = 10;
+    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update in database
+    await updateUserPasswordInDb(user.id, newPasswordHash);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully',
     });
   } catch (error) {
     next(error);

@@ -14,8 +14,9 @@ The Chef Backend/
 │   │   └── env.ts                  # Environment variables loader & validator
 │   │
 │   ├── controllers/                # Request handlers
-│   │   ├── auth.controller.ts      # Register, Login, Current User (Me)
+│   │   ├── auth.controller.ts      # Register, Login, Me, Change Password
 │   │   ├── meal.controller.ts      # Upload Meal & Fetch Meal of the Day
+│   │   ├── menuItem.controller.ts  # Fetch and Manage Menu Items (MenuItem table)
 │   │   └── user.controller.ts      # User profile & Admin user management
 │   │
 │   ├── middlewares/                # Custom middlewares
@@ -24,11 +25,13 @@ The Chef Backend/
 │   │
 │   ├── models/                     # Neon Database Models & SQL Queries
 │   │   ├── meal.model.ts           # Meal entity, SQL table init, DB queries
+│   │   ├── menuItem.model.ts       # MenuItem entity, SQL table init, DB queries
 │   │   └── user.model.ts           # User entity, SQL table init, DB queries
 │   │
 │   ├── routes/                     # API Routes
-│   │   ├── auth.routes.ts          # /api/auth (register, login, me)
+│   │   ├── auth.routes.ts          # /api/auth (register, login, me, change-password)
 │   │   ├── meal.routes.ts          # /api/meals (upload, today)
+│   │   ├── menuItem.routes.ts      # /api/menu-items (fetch all, single, create)
 │   │   ├── user.routes.ts          # /api/users
 │   │   └── index.ts                # Central router & /api/health
 │   │
@@ -56,25 +59,32 @@ The Chef Backend/
 ## 📡 API Endpoints
 
 ### 🔑 Authentication Routes (`/api/auth`)
-| Method | Endpoint | Access | Description |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/register` | Public | Register new user (`name`, `email`, `password`, `role`) |
-| `POST` | `/api/auth/login` | Public | Login with email & password, returns JWT token |
-| `GET` | `/api/auth/me` | Authenticated | Get current logged-in user profile |
-
-### 🍲 Meal Routes (`/api/meals`)
 | Method | Endpoint | Access | Description | Request Body |
 | :--- | :--- | :--- | :--- | :--- |
-| `POST` | `/api/meals` | Chef / Admin | Upload meal to database | `{ "name": "Pasta", "image": "https://...", "quantity": 10, "date": "2026-08-03" }` |
-| `POST` | `/api/meals/upload` | Chef / Admin | Alias route for meal upload | Same as above |
-| `GET` | `/api/meals/today` | Public | Fetch today's meals (`YYYY-MM-DD`) | None |
-| `GET` | `/api/meals?date=YYYY-MM-DD` | Public | Fetch meals for any specific calendar date | None |
+| `POST` | `/api/auth/register` | Public | Register new user (`name`, `email`, `password`, `role`) | `{ "name": "...", "email": "...", "password": "...", "role": "chef" }` |
+| `POST` | `/api/auth/login` | Public | Login with email & password | `{ "email": "...", "password": "..." }` |
+| `GET` | `/api/auth/me` | Authenticated | Get logged-in user profile | None |
+| `POST` / `PUT` | `/api/auth/change-password` | Authenticated | Change user password | `{ "currentPassword": "...", "newPassword": "..." }` |
+
+### 🍽️ Menu Item Routes (`/api/menu-items`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/menu-items` | Public | Fetch all menu items (`?category=...`, `?isAvailable=true`, `?isFeatured=true`, `?search=...`) |
+| `GET` | `/api/menu-items/:id` | Public | Fetch a single menu item by ID |
+| `POST` | `/api/menu-items` | Chef / Admin | Create a new menu item |
+
+### 🍲 Meal of the Day Routes (`/api/meals`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/meals/today` | Public | Fetch today's scheduled meals (`YYYY-MM-DD`) |
+| `GET` | `/api/meals?date=YYYY-MM-DD` | Public | Fetch meals for any specific calendar date |
+| `POST` | `/api/meals` | Chef / Admin | Upload scheduled meal (`name`, `image`, `quantity`, `date`) |
 
 ### 👤 User Routes (`/api/users`)
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/users/profile` | Authenticated | View authenticated user profile |
-| `GET` | `/api/users` | Admin Only | List all users (supports `?role=chef`) |
+| `GET` | `/api/users` | Admin Only | List all users |
 
 ---
 
