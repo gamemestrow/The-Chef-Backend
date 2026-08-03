@@ -28,3 +28,11 @@ export interface ApiResponse<T = unknown> {
   error?: string | null;
   meta?: Record<string, unknown>;
 }
+
+// Meal of the Day interface
+export interface MealOfTheDay {
+  name: string;
+  image: string;
+  quantity: number;
+}
+

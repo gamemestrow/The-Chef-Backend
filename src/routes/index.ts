@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import authRoutes from './auth.routes';
 import userRoutes from './user.routes';
+import mealRoutes from './meal.routes';
 import { checkDbConnection } from '../config/db';
 
 const router = Router();
@@ -21,5 +22,6 @@ router.get('/health', async (_req: Request, res: Response) => {
 // Mount Routes
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
+router.use('/meals', mealRoutes);
 
 export default router;
