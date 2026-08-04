@@ -3,6 +3,7 @@ import { env } from './config/env';
 import { checkDbConnection } from './config/db';
 import { initUserTable } from './models/user.model';
 import { initMealTable } from './models/meal.model';
+import { initChefMealTable } from './models/chef_meal.model';
 
 const startServer = async () => {
   try {
@@ -13,6 +14,7 @@ const startServer = async () => {
       // Initialize schemas in Neon DB
       await initUserTable();
       await initMealTable();
+      await initChefMealTable();
     } else {
       console.log('ℹ️  Running with offline / placeholder database mode until valid DATABASE_URL is configured in .env.');
     }

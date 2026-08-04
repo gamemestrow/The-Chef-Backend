@@ -101,3 +101,54 @@ export interface PaginatedMealsResponse {
   data: MealRecord[];
   pagination: PaginationMeta;
 }
+
+// Chef Meal Lifecycle Status
+export type ChefMealStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
+
+// Single Food Item Input for Chef Bulk Upload
+export interface SingleChefFoodInput {
+  name: string;
+  image: string;
+  quantity: number;
+  unit: string;
+}
+
+// Create Bulk Chef Meals Input
+export interface CreateBulkChefMealsInput {
+  date: string;
+  mealTime: string;
+  hostelId: string;
+  foods: SingleChefFoodInput[];
+  createdBy?: string;
+  status?: ChefMealStatus;
+}
+
+// Chef Meal Record as stored and returned from Database
+export interface ChefMealRecord {
+  id: string;
+  chefId: string | null;
+  hostelId: string;
+  mealTime: string;
+  mealDate: string;
+  foodName: string;
+  quantity: number;
+  unit: string;
+  imageUrl: string;
+  status: ChefMealStatus;
+  rejectionReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Query parameters for Chef History API
+export interface ChefMealQueryParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  mealTime?: string;
+  hostelId?: string;
+  date?: string;
+  status?: ChefMealStatus;
+  sortBy?: string;
+  sortOrder?: 'ASC' | 'DESC' | 'asc' | 'desc';
+}
