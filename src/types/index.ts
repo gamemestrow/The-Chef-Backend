@@ -34,6 +34,7 @@ export interface SingleFoodInput {
   name: string;
   image: string;
   quantity: number;
+  unit: string;
 }
 
 // Create Bulk Meals Input
@@ -55,6 +56,7 @@ export interface MealRecord {
   imageUrl: string;
   image: string;
   quantity: number;
+  unit: string;
   mealDate: string;
   date: string;
   createdBy: string | null;
@@ -67,6 +69,7 @@ export interface MealOfTheDay {
   name: string;
   image: string;
   quantity: number;
+  unit: string;
 }
 
 // Query parameters for History API

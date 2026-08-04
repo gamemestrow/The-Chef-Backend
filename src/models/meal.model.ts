@@ -29,6 +29,7 @@ export const initMealTable = async (): Promise<void> => {
     ALTER TABLE meals ADD COLUMN IF NOT EXISTS name VARCHAR(255);
     ALTER TABLE meals ADD COLUMN IF NOT EXISTS image TEXT;
     ALTER TABLE meals ADD COLUMN IF NOT EXISTS date DATE DEFAULT CURRENT_DATE;
+    ALTER TABLE meals ADD COLUMN IF NOT EXISTS unit VARCHAR(20) NOT NULL DEFAULT 'kg';
 
     CREATE INDEX IF NOT EXISTS idx_meals_meal_date ON meals(meal_date);
     CREATE INDEX IF NOT EXISTS idx_meals_date ON meals(date);
@@ -77,6 +78,7 @@ const formatMealRow = (row: any): MealRecord => {
     imageUrl,
     image: imageUrl,
     quantity: Number(row.quantity || 1),
+    unit: row.unit ? String(row.unit).toLowerCase() : 'kg',
     mealDate,
     date: mealDate,
     createdBy: row.created_by ? String(row.created_by) : null,
@@ -121,9 +123,10 @@ export const createBulkMealsInDb = async (input: CreateBulkMealsInput): Promise<
     const foodName = food.name.trim();
     const foodImage = food.image.trim();
     const foodQty = Math.max(1, Math.floor(food.quantity));
+    const foodUnit = (food.unit || 'kg').toLowerCase().trim();
 
     valueRows.push(
-      `($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3}, $${paramIdx + 4}, $${paramIdx + 5}, $${paramIdx + 6}, $${paramIdx + 7}, $${paramIdx + 8}, $${paramIdx + 9})`
+      `($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3}, $${paramIdx + 4}, $${paramIdx + 5}, $${paramIdx + 6}, $${paramIdx + 7}, $${paramIdx + 8}, $${paramIdx + 9}, $${paramIdx + 10})`
     );
 
     queryParams.push(
@@ -134,12 +137,13 @@ export const createBulkMealsInDb = async (input: CreateBulkMealsInput): Promise<
       foodImage,
       foodImage,
       foodQty,
+      foodUnit,
       date.trim(),
       date.trim(),
       validCreatedBy
     );
 
-    paramIdx += 10;
+    paramIdx += 11;
   });
 
   const query = `
@@ -151,12 +155,13 @@ export const createBulkMealsInDb = async (input: CreateBulkMealsInput): Promise<
       image_url,
       image,
       quantity,
+      unit,
       meal_date,
       date,
       created_by
     )
     VALUES ${valueRows.join(', ')}
-    RETURNING id, hostel_id, meal_time, meal_name, name, image_url, image, quantity, meal_date, date, created_by, created_at, updated_at
+    RETURNING id, hostel_id, meal_time, meal_name, name, image_url, image, quantity, unit, meal_date, date, created_by, created_at, updated_at
   `;
 
   const result = await pool.query(query, queryParams);
@@ -245,6 +250,7 @@ export const findMealsWithPaginationInDb = async (
       COALESCE(image_url, image) AS image_url,
       image,
       quantity,
+      COALESCE(unit, 'kg') AS unit,
       COALESCE(meal_date, date) AS meal_date,
       date,
       created_by,

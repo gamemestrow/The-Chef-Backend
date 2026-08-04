@@ -78,13 +78,14 @@ export const createBulkMealsService = async (
   const uploadedFilesList: Express.Multer.File[] = Array.isArray(files)
     ? files
     : files
-    ? Object.values(files).flat()
-    : [];
+      ? Object.values(files).flat()
+      : [];
 
   const parsedFoods: SingleFoodInput[] = foodsArray.map((item, idx) => {
     let name = item?.name;
     let image = item?.image;
     let quantity = Number(item?.quantity || 1);
+    let rawUnit = (item?.unit || 'kg').toString().toLowerCase().trim();
 
     // If an image file was uploaded for this food item index
     if (uploadedFilesList[idx]) {
@@ -107,10 +108,15 @@ export const createBulkMealsService = async (
       throw new AppError(400, `Food item #${idx + 1} quantity must be a positive integer`);
     }
 
+    if (!['kg', 'pieces', 'liters', 'liter'].includes(rawUnit)) {
+      throw new AppError(400, `Food item #${idx + 1} unit must be "kg", "pieces", or "liters"`);
+    }
+
     return {
       name: name.trim(),
       image: image.trim(),
       quantity,
+      unit: rawUnit,
     };
   });
 
@@ -171,5 +177,6 @@ export const getMealOfTheDayService = async (targetDate?: string): Promise<MealO
     name: record.mealName || record.name,
     image: record.imageUrl || record.image,
     quantity: record.quantity,
+    unit: record.unit || 'kg',
   }));
 };

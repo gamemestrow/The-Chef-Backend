@@ -33,6 +33,18 @@ export const initUserTable = async (): Promise<void> => {
   try {
     await pool.query(query);
     console.log('✅ Neon DB users table initialized.');
+
+    // Seed default chef account if no user with chef@mess.com exists
+    const existingChef = await pool.query(`SELECT id FROM users WHERE LOWER(email) = 'chef@mess.com'`);
+    if (existingChef.rows.length === 0) {
+      const bcrypt = require('bcryptjs');
+      const hashedPassword = await bcrypt.hash('password123', 10);
+      await pool.query(
+        `INSERT INTO users (email, password_hash, name, role) VALUES ($1, $2, $3, $4)`,
+        ['chef@mess.com', hashedPassword, 'Chef Marco Rossi', 'chef']
+      );
+      console.log('🧑‍🍳 Default chef user seeded: chef@mess.com / password123');
+    }
   } catch (error) {
     console.error('❌ Failed to initialize users table:', error instanceof Error ? error.message : error);
   }
