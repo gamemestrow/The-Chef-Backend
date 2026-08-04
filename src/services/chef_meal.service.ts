@@ -1,3 +1,5 @@
+import path from 'path';
+import fs from 'fs';
 import {
   createBulkChefMealsInDb,
   findChefMealsWithPaginationInDb,
@@ -12,6 +14,7 @@ import {
   ChefMealQueryParams,
 } from '../types';
 import { AppError } from '../middlewares/error.middleware';
+import { isCloudinaryConfigured, uploadBufferToCloudinary } from '../config/cloudinary';
 
 export interface PaginatedChefMealsResponse {
   success: boolean;
@@ -29,6 +32,7 @@ export interface PaginatedChefMealsResponse {
 
 /**
  * Service to process bulk chef meal uploads.
+ * Uploads images directly to Cloudinary if configured, or falls back to local disk.
  */
 export const createBulkChefMealsService = async (
   rawBody: any,
@@ -80,7 +84,10 @@ export const createBulkChefMealsService = async (
       ? Object.values(files).flat()
       : [];
 
-  const parsedFoods: SingleChefFoodInput[] = foodsArray.map((item, idx) => {
+  const parsedFoods: SingleChefFoodInput[] = [];
+
+  for (let idx = 0; idx < foodsArray.length; idx++) {
+    const item = foodsArray[idx];
     let name = item?.name;
     let image = item?.image || item?.imageUrl;
     let quantity = Number(item?.quantity || 1);
@@ -88,7 +95,25 @@ export const createBulkChefMealsService = async (
 
     if (uploadedFilesList[idx]) {
       const file = uploadedFilesList[idx];
-      image = `/uploads/${file.filename}`;
+      if (file.buffer && isCloudinaryConfigured()) {
+        try {
+          image = await uploadBufferToCloudinary(file.buffer, 'chef_meals');
+        } catch (cloudinaryErr: any) {
+          throw new AppError(500, `Cloudinary upload failed: ${cloudinaryErr.message}`);
+        }
+      } else if (file.buffer) {
+        const uploadDir = path.resolve(process.cwd(), 'uploads');
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        const ext = path.extname(file.originalname) || '.jpg';
+        const safeName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9]/g, '_');
+        const filename = `${safeName}-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+        fs.writeFileSync(path.join(uploadDir, filename), file.buffer);
+        image = `/uploads/${filename}`;
+      } else if (file.filename) {
+        image = `/uploads/${file.filename}`;
+      }
     }
 
     if (!name || typeof name !== 'string' || !name.trim()) {
@@ -112,13 +137,13 @@ export const createBulkChefMealsService = async (
 
     const unit = rawUnit === 'liter' ? 'liters' : rawUnit;
 
-    return {
+    parsedFoods.push({
       name: name.trim(),
       image: image.trim(),
       quantity,
       unit,
-    };
-  });
+    });
+  }
 
   const bulkInput: CreateBulkChefMealsInput = {
     date: date.trim(),
