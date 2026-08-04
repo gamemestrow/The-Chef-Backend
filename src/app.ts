@@ -2,6 +2,7 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'path';
 import { env } from './config/env';
 import routes from './routes';
 import { errorHandler } from './middlewares/error.middleware';
@@ -9,7 +10,9 @@ import { errorHandler } from './middlewares/error.middleware';
 const app: Application = express();
 
 // Security & Utility Middlewares
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(
   cors({
     origin: env.CLIENT_ORIGIN === '*' ? true : env.CLIENT_ORIGIN.split(','),
@@ -23,6 +26,9 @@ if (env.NODE_ENV !== 'test') {
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static uploaded images
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // Root Endpoint
 app.get('/', (_req: Request, res: Response) => {

@@ -1,13 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
-import { getMealOfTheDay, getFormattedDate } from '../services/meal.service';
-import { createMealInDb } from '../models/meal.model';
-import { AuthenticatedRequest } from '../types';
-import { AppError } from '../middlewares/error.middleware';
+import {
+  createBulkMealsService,
+  getHistoryMealsService,
+  getMealOfTheDayService,
+} from '../services/meal.service';
+import { AuthenticatedRequest, MealQueryParams } from '../types';
 
 /**
- * Controller to upload a new meal to the database.
- * Requires: name, image, quantity. Optional: date (defaults to today YYYY-MM-DD).
+ * Controller to upload multiple food items together in a single request.
  * Endpoint: POST /api/meals
+ * Accepts: multipart/form-data
  */
 export const uploadMeal = async (
   req: AuthenticatedRequest,
@@ -15,38 +17,16 @@ export const uploadMeal = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { name, image, quantity, date } = req.body;
-
-    // Validate required fields
-    if (!name || typeof name !== 'string' || !name.trim()) {
-      throw new AppError(400, 'Meal name is required');
-    }
-
-    if (!image || typeof image !== 'string' || !image.trim()) {
-      throw new AppError(400, 'Meal image is required (URL or image data)');
-    }
-
-    const parsedQuantity = Number(quantity);
-    if (isNaN(parsedQuantity) || parsedQuantity < 1) {
-      throw new AppError(400, 'Meal quantity must be a valid positive integer');
-    }
-
-    // Target date formatting
-    const scheduledDate = date ? String(date).trim() : getFormattedDate();
-
-    // Insert meal into Neon PostgreSQL
-    const newMeal = await createMealInDb({
-      name: name.trim(),
-      image: image.trim(),
-      quantity: parsedQuantity,
-      date: scheduledDate,
-      createdBy: req.user?.id,
-    });
+    const createdRecords = await createBulkMealsService(
+      req.body,
+      req.files as Express.Multer.File[],
+      req.user?.id
+    );
 
     res.status(201).json({
       success: true,
-      message: 'Meal uploaded successfully to database',
-      data: newMeal,
+      message: `${createdRecords.length} food item(s) uploaded successfully`,
+      data: createdRecords,
     });
   } catch (error) {
     next(error);
@@ -54,8 +34,39 @@ export const uploadMeal = async (
 };
 
 /**
- * Controller to fetch Meal of the Day by date
- * Endpoint: GET /api/meals/today or GET /api/meals?date=YYYY-MM-DD
+ * Controller to fetch paginated meal history with server-side filtering, searching, and sorting in PostgreSQL.
+ * Endpoint: GET /api/meals
+ * Query Params: page, limit, search, mealTime, hostelId, date, sortBy, sortOrder
+ */
+export const getMeals = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const queryParams: MealQueryParams = {
+      page: req.query.page ? parseInt(req.query.page as string, 10) : undefined,
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
+      search: req.query.search ? (req.query.search as string) : undefined,
+      mealTime: req.query.mealTime ? (req.query.mealTime as string) : undefined,
+      hostelId: req.query.hostelId ? (req.query.hostelId as string) : undefined,
+      date: req.query.date ? (req.query.date as string) : undefined,
+      sortBy: req.query.sortBy ? (req.query.sortBy as string) : undefined,
+      sortOrder: req.query.sortOrder
+        ? ((req.query.sortOrder as string).toUpperCase() as 'ASC' | 'DESC')
+        : undefined,
+    };
+
+    const response = await getHistoryMealsService(queryParams);
+    res.status(200).json(response);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Controller to fetch Meal of the Day by date (legacy/simplified route).
+ * Endpoint: GET /api/meals/today
  */
 export const getTodayMeals = async (
   req: Request,
@@ -64,14 +75,11 @@ export const getTodayMeals = async (
 ): Promise<void> => {
   try {
     const requestedDate = (req.query.date as string) || undefined;
-    const targetDate = requestedDate || getFormattedDate();
-
-    const meals = await getMealOfTheDay(requestedDate);
+    const meals = await getMealOfTheDayService(requestedDate);
 
     res.status(200).json({
       success: true,
-      message: `Meals for ${targetDate} retrieved successfully`,
-      date: targetDate,
+      message: 'Meals retrieved successfully',
       count: meals.length,
       data: meals,
     });
