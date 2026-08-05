@@ -6,6 +6,7 @@ import { initMealTable } from './models/meal.model';
 import { initMenuItemTable } from './models/menuItem.model';
 import { initFeedbackTable } from './models/feedback.model';
 import { initNotificationTable } from './models/notification.model';
+import { initChefMealTable } from './models/chef_meal.model';
 
 const startServer = async () => {
   try {
@@ -19,12 +20,13 @@ const startServer = async () => {
       await initMenuItemTable();
       await initFeedbackTable();
       await initNotificationTable();
+      await initChefMealTable();
     } else {
       console.log('ℹ️  Running with offline / placeholder database mode until valid DATABASE_URL is configured in .env.');
     }
 
-    const server = app.listen(env.PORT, () => {
-      console.log(`🚀 Server ready & listening on http://localhost:${env.PORT}`);
+    const server = app.listen(env.PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server ready & listening on http://0.0.0.0:${env.PORT}`);
       console.log(`📡 Environment: ${env.NODE_ENV}`);
       console.log(`🩺 Health check: http://localhost:${env.PORT}/api/health`);
     });

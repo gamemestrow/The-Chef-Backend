@@ -5,6 +5,7 @@ import mealRoutes from './meal.routes';
 import menuItemRoutes from './menuItem.routes';
 import feedbackRoutes from './feedback.routes';
 import notificationRoutes from './notification.routes';
+import chefMealRoutes from './chef_meal.routes';
 import { checkDbConnection } from '../config/db';
 
 const router = Router();
@@ -30,5 +31,7 @@ router.use('/menu-items', menuItemRoutes);
 router.use('/feedback', feedbackRoutes);
 router.use('/student-notifications', notificationRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/chef/meals', chefMealRoutes);
+
 
 export default router;
