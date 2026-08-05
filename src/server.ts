@@ -1,21 +1,28 @@
 import app from './app';
 import { env } from './config/env';
 import { checkDbConnection } from './config/db';
+import { initUserTable } from './models/user.model';
+import { initMealTable } from './models/meal.model';
+import { initChefMealTable } from './models/chef_meal.model';
 
 const startServer = async () => {
   try {
-    // Attempt database health ping
+    // Attempt database connection check
     const dbConnected = await checkDbConnection();
     if (dbConnected) {
       console.log('✅ Connected to Neon PostgreSQL Database successfully.');
+      // Initialize schemas in Neon DB
+      await initUserTable();
+      await initMealTable();
+      await initChefMealTable();
     } else {
-      console.log('ℹ️  Running with offline / mock database mode until valid DATABASE_URL is provided.');
+      console.log('ℹ️  Running with offline / placeholder database mode until valid DATABASE_URL is configured in .env.');
     }
 
-    const server = app.listen(env.PORT, () => {
-      console.log(`🚀 Server ready & listening on http://localhost:${env.PORT}`);
+    const server = app.listen(env.PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server ready & listening on http://0.0.0.0:${env.PORT}`);
       console.log(`📡 Environment: ${env.NODE_ENV}`);
-      console.log(`🩺 Health check: http://localhost:${env.PORT}/api/v1/health`);
+      console.log(`🩺 Health check: http://localhost:${env.PORT}/api/health`);
     });
 
     // Graceful Shutdown Handlers
