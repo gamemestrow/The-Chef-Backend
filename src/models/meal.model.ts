@@ -1,4 +1,15 @@
+import { randomUUID } from 'crypto';
 import { getDbPool } from '../config/db';
+
+
+export interface CreateMealInput {
+  id?: string;
+  name: string;
+  image: string;
+  quantity: number;
+  date?: string;
+  createdBy?: string;
+}
 import { MealRecord, CreateBulkMealsInput, MealQueryParams } from '../types';
 
 /**
@@ -48,8 +59,29 @@ export const initMealTable = async (): Promise<void> => {
 /**
  * Formats database row into a standardized MealRecord object.
  */
+export const createMealInDb = async (meal: CreateMealInput): Promise<MealRecord> => {
+  const pool = getDbPool();
+  const id = meal.id || randomUUID();
 
-const formatMealRow = (row: any): MealRecord => {
+  const query = `
+    INSERT INTO meals (id, name, image, quantity, date, created_by)
+    VALUES ($1, $2, $3, $4, COALESCE($5::date, CURRENT_DATE), $6)
+    RETURNING id, name, image, quantity, date, created_by, created_at, updated_at
+  `;
+
+  const result = await pool.query(query, [
+    id,
+    meal.name.trim(),
+    meal.image.trim(),
+    meal.quantity,
+    meal.date || null,
+    meal.createdBy || null,
+  ]);
+  
+  return formatMealRow(result.rows[0]);
+};
+
+export const formatMealRow = (row: any): MealRecord => {
   const mealName = String(row.meal_name || row.name || '');
   const imageUrl = String(row.image_url || row.image || '');
   const rawDate = row.meal_date || row.date;

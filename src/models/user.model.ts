@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { getDbPool } from '../config/db';
 import { UserRole } from '../types';
 
@@ -54,19 +55,23 @@ export const initUserTable = async (): Promise<void> => {
  * Inserts a new user into Neon PostgreSQL.
  */
 export const createUserInDb = async (user: {
+  id?: string;
   email: string;
   passwordHash: string;
   name: string;
   role: UserRole;
 }): Promise<SafeUser> => {
   const pool = getDbPool();
+  const id = user.id || randomUUID();
+
   const query = `
-    INSERT INTO users (email, password_hash, name, role)
-    VALUES ($1, $2, $3, $4)
+    INSERT INTO users (id, email, password_hash, name, role)
+    VALUES ($1, $2, $3, $4, $5)
     RETURNING id, email, name, role, created_at, updated_at
   `;
 
   const result = await pool.query(query, [
+    id,
     user.email.toLowerCase().trim(),
     user.passwordHash,
     user.name.trim(),
@@ -106,6 +111,37 @@ export const findUserByIdInDb = async (id: string): Promise<SafeUser | null> => 
 
   const result = await pool.query(query, [id]);
   return result.rows[0] || null;
+};
+
+/**
+ * Finds a user by ID, including password hash (for password verification / change).
+ */
+export const findUserWithPasswordByIdInDb = async (id: string): Promise<UserRecord | null> => {
+  const pool = getDbPool();
+  const query = `
+    SELECT id, email, password_hash, name, role, created_at, updated_at
+    FROM users
+    WHERE id = $1
+    LIMIT 1
+  `;
+
+  const result = await pool.query(query, [id]);
+  return result.rows[0] || null;
+};
+
+/**
+ * Updates a user's password in Neon PostgreSQL.
+ */
+export const updateUserPasswordInDb = async (id: string, newPasswordHash: string): Promise<boolean> => {
+  const pool = getDbPool();
+  const query = `
+    UPDATE users
+    SET password_hash = $1, updated_at = CURRENT_TIMESTAMP
+    WHERE id = $2
+  `;
+
+  const result = await pool.query(query, [newPasswordHash, id]);
+  return (result.rowCount ?? 0) > 0;
 };
 
 /**
